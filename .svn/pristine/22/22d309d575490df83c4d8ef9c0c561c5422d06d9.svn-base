@@ -1,0 +1,555 @@
+Index: build_tools/mozc_version.py
+===================================================================
+--- build_tools/mozc_version.py	(revision 112)
++++ build_tools/mozc_version.py	(working copy)
+@@ -249,7 +249,7 @@
+   def IsDevChannel(self):
+     """Returns true if the parsed version is dev-channel."""
+     revision = self._properties['REVISION']
+-    return revision is not None and len(revision) >= 3 and revision[-3] == '1'
++    return False
+ 
+   def GetTargetPlatform(self):
+     """Returns the target platform.
+Index: unix/ibus/main.cc
+===================================================================
+--- unix/ibus/main.cc	(revision 39)
++++ unix/ibus/main.cc	(working copy)
+@@ -49,7 +49,7 @@
+   // Don't wait() child process termination.
+   struct sigaction sa;
+   sa.sa_handler = SIG_IGN;
+-  ::sigemptyset(&sa.sa_mask);
++  sigemptyset(&sa.sa_mask);
+   sa.sa_flags = 0;
+   CHECK_EQ(0, ::sigaction(SIGCHLD, &sa, NULL));
+   // TODO(taku): move this function inside client::Session::LaunchTool
+Index: unix/uim/uim-macuim.gyp
+===================================================================
+--- unix/uim/uim-macuim.gyp	(revision 0)
++++ unix/uim/uim-macuim.gyp	(revision 0)
+@@ -0,0 +1,98 @@
++#
++# Copyright (c) 2010 uim Project http://code.google.com/p/uim/
++#
++# All rights reserved.
++#
++# Redistribution and use in source and binary forms, with or without
++# modification, are permitted provided that the following conditions
++# are met:
++# 1. Redistributions of source code must retain the above copyright
++#    notice, this list of conditions and the following disclaimer.
++# 2. Redistributions in binary form must reproduce the above copyright
++#    notice, this list of conditions and the following disclaimer in the
++#    documentation and/or other materials provided with the distribution.
++# 3. Neither the name of authors nor the names of its contributors
++#    may be used to endorse or promote products derived from this software
++#    without specific prior written permission.
++#
++# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS ``AS IS'' AND
++# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++# ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE LIABLE
++# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
++# OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
++# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++# SUCH DAMAGE.
++#
++
++{
++  'variables': {
++    'relative_dir': 'unix/uim',
++    'pkg_config_libs': [
++      'uim',
++    ],
++    'uim_dep_include_dirs': [
++      '/Library/Frameworks/UIM.framework/Versions/Current/Headers',
++    ],
++    'uim_dependencies': [
++      '../../base/base.gyp:base',
++      '../../client/client.gyp:client',
++    ],
++  },
++  'targets': [
++    {
++      'target_name': 'uim_mozc_lib',
++      'type': 'static_library',
++      'sources': [
++        'key_translator.cc',
++      ],
++      'dependencies': [
++        '../../session/session_base.gyp:session_protocol',
++      ],
++      'cflags': [
++        '<!@(pkg-config --cflags <@(pkg_config_libs))',
++      ],
++      'include_dirs': [
++        '<@(uim_dep_include_dirs)',
++      ],
++    },
++    {
++      'target_name': 'uim-mozc',
++      'type': 'loadable_module',
++      'sources': [
++        'mozc.cc',
++      ],
++      'dependencies': [
++        '<@(uim_dependencies)',
++        'uim_mozc_lib',
++      ],
++      'cflags': [
++        '<!@(pkg-config --cflags <@(pkg_config_libs))',
++      ],
++      'include_dirs': [
++        '<@(uim_dep_include_dirs)',
++      ],
++      'libraries': [
++        #'<!@(pkg-config --libs-only-l <@(pkg_config_libs))',
++        'UIM.framework',
++        '/usr/lib/libiconv.dylib',
++      ],
++      'ldflags': [
++        '<!@(pkg-config --libs-only-L <@(pkg_config_libs))',
++      ],
++      'mac_framework_dirs': [
++	 '/Library/Frameworks'
++      ],
++      'xcode_settings': {
++       'GCC_SYMBOLS_PRIVATE_EXTERN': 'NO',
++       'DYLIB_COMPATIBILITY_VERSION': '',
++       'DYLIB_CURRENT_VERSION': '',
++       'EXECUTABLE_PREFIX': 'lib',
++       'EXECUTABLE_EXTENSION': 'so',
++      }
++    },
++  ],
++}
+Index: uim-macfink.gyp
+===================================================================
+--- unix/uim/uim-macfink.gyp	(revision 0)
++++ unix/uim/uim-macfink.gyp	(revision 0)
+@@ -0,0 +1,101 @@
++#
++# Copyright (c) 2010 uim Project http://code.google.com/p/uim/
++#
++# All rights reserved.
++#
++# Redistribution and use in source and binary forms, with or without
++# modification, are permitted provided that the following conditions
++# are met:
++# 1. Redistributions of source code must retain the above copyright
++#    notice, this list of conditions and the following disclaimer.
++# 2. Redistributions in binary form must reproduce the above copyright
++#    notice, this list of conditions and the following disclaimer in the
++#    documentation and/or other materials provided with the distribution.
++# 3. Neither the name of authors nor the names of its contributors
++#    may be used to endorse or promote products derived from this software
++#    without specific prior written permission.
++#
++# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS ``AS IS'' AND
++# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++# ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE LIABLE
++# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
++# OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
++# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++# SUCH DAMAGE.
++#
++
++{
++  'variables': {
++    'relative_dir': 'unix/uim',
++    'pkg_config_libs': [
++      'uim',
++    ],
++    'uim_dep_include_dirs': [
++      '/sw/include/uim',
++      '/sw/include',
++    ],
++    'uim_dependencies': [
++      '../../base/base.gyp:base',
++      '../../client/client.gyp:client',
++    ],
++  },
++  'targets': [
++    {
++      'target_name': 'uim_mozc_lib',
++      'type': 'static_library',
++      'sources': [
++        'key_translator.cc',
++      ],
++      'dependencies': [
++        '../../session/session_base.gyp:session_protocol',
++      ],
++      'cflags': [
++        '<!@(pkg-config --cflags <@(pkg_config_libs))',
++      ],
++      'include_dirs': [
++        '<@(uim_dep_include_dirs)',
++      ],
++    },
++    {
++      'target_name': 'uim-mozc',
++      'type': 'loadable_module',
++      'sources': [
++        'mozc.cc',
++      ],
++      'dependencies': [
++        '<@(uim_dependencies)',
++        'uim_mozc_lib',
++      ],
++      'cflags': [
++        '<!@(pkg-config --cflags <@(pkg_config_libs))',
++      ],
++      'include_dirs': [
++        '<@(uim_dep_include_dirs)',
++      ],
++      'libraries': [
++        #'<!@(pkg-config --libs-only-l <@(pkg_config_libs))',
++        '/sw/lib/libuim.dylib',
++        '/sw/lib/libuim-scm.dylib',
++	'/sw/lib/libintl.dylib',
++	'/sw/lib/libiconv.dylib',
++      ],
++      'ldflags': [
++        '<!@(pkg-config --libs-only-L <@(pkg_config_libs))',
++      ],
++      'library_dirs': [
++        '/sw/lib',
++      ],
++      'xcode_settings': {
++       'GCC_SYMBOLS_PRIVATE_EXTERN': 'NO',
++       'DYLIB_COMPATIBILITY_VERSION': '',
++       'DYLIB_CURRENT_VERSION': '',
++       'EXECUTABLE_PREFIX': 'lib',
++       'EXECUTABLE_EXTENSION': 'so',
++      }
++    },
++  ],
++}
+Index: mac/mozc_server_info
+===================================================================
+--- mac/mozc_server_info	(revision 0)
++++ mac/mozc_server_info	(revision 0)
+@@ -0,0 +1,38 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
++<plist version="1.0">
++<dict>
++ <key>CFBundleDevelopmentRegion</key>
++ <string>Japanese</string>
++ <key>CFBundleDisplayName</key>
++ <string>MozcConverter</string>
++ <key>CFBundleExecutable</key>
++ <string>MozcConverter</string>
++ <key>CFBundleIconFile</key>
++ <string>product_icon.icns</string>
++ <key>CFBundleIdentifier</key>
++ <string>org.mozc.inputmethod.Japanese.Converter</string>
++ <key>CFBundleInfoDictionaryVersion</key>
++ <string>6.0</string>
++ <key>CFBundleName</key>
++ <string>MozcConverter</string>
++ <key>CFBundlePackageType</key>
++ <string>APPL</string>
++ <key>CFBundleSignature</key>
++ <string>????</string>
++ <key>CFBundleVersion</key>
++ <string>${GOOGLE_VERSIONINFO_LONG}</string>
++ <key>CFBundleShortVersionString</key>
++ <string>${GOOGLE_VERSIONINFO_SHORT}</string>
++ <key>CFBundleGetInfoString</key>
++ <string>${GOOGLE_VERSIONINFO_FINDER}</string>
++ <key>NSHumanReadableCopyright</key>
++ <string>${GOOGLE_VERSIONINFO_ABOUT}</string>
++ <key>CSResourcesFileMapped</key>
++ <true/>
++ <key>LSBackgroundOnly</key>
++ <string>1</string>
++ <key>NSPrincipalClass</key>
++ <string>NSApplication</string>
++</dict>
++</plist>
+Index: mac/org.mozc.inputmethod.Japanaes.Converter.MacUIM.plist
+===================================================================
+--- mac/org.mozc.inputmethod.Japanaes.Converter.MacUIM.plist	(revision 0)
++++ mac/org.mozc.inputmethod.Japanaes.Converter.MacUIM.plist	(revision 0)
+@@ -0,0 +1,17 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
++<plist version="1.0">
++<dict>
++	<key>Program</key>
++	<string>/Library/Mozc/MozcConverter.app/Contents/MacOS/MozcConverter</string>
++	<key>Label</key>
++	<string>org.mozc.inputmethod.Japanese.Converter</string>
++	<key>MachServices</key>
++	<dict>
++		<key>org.mozc.inputmethod.Japanese.Converter.mozc_session</key>
++		<true/>
++	</dict>
++	<key>KeepAlive</key>
++	<false/>
++</dict>
++</plist>
+Index: base/base.gyp
+===================================================================
+--- base/base.gyp	(revision 170)
++++ base/base.gyp	(working copy)
+@@ -466,7 +466,7 @@
+         }],
+         ['OS=="mac"', {
+           'sources': [
+-            'crash_report_handler_mac.mm',
++#            'crash_report_handler_mac.mm',
+           ],
+           'sources!': [
+             'crash_report_handler.cc',
+Index: base/mac_util.mm
+===================================================================
+--- base/mac_util.mm	(revision 109)
++++ base/mac_util.mm	(working copy)
+@@ -42,16 +42,21 @@
+ 
+ namespace mozc {
+ namespace {
++#ifdef GOOGLE_JAPANESE_INPUT_BUILD
+ const char kServerDirectory[] =
+     "/Library/Input Methods/" kProductPrefix ".app/Contents/Resources";
+ const unsigned char kPrelauncherPath[] =
+     "/Library/Input Methods/" kProductPrefix ".app/Contents/Resources/"
+     kProductPrefix "Prelauncher.app";
+ 
+-#ifdef GOOGLE_JAPANESE_INPUT_BUILD
+ const char kProjectPrefix[] =
+     "com.google.inputmethod.Japanese.";
+ #elif defined(MOZC_BUILD)
++const char kServerDirectory[] =
++    "/Library/" kProductPrefix;
++const unsigned char kPrelauncherPath[] =
++    "/Library/" kProductPrefix "Prelauncher.app";
++
+ const char kProjectPrefix[] =
+     "org.mozc.inputmethod.Japanese.";
+ #else
+Index: base/system_util.cc
+===================================================================
+--- base/system_util.cc	(revision 151)
++++ base/system_util.cc	(working copy)
+@@ -270,7 +270,8 @@
+ 
+ #elif defined(OS_MACOSX)
+   dir = MacUtil::GetApplicationSupportDirectory();
+-#ifdef GOOGLE_JAPANESE_INPUT_BUILD
++//#ifdef GOOGLE_JAPANESE_INPUT_BUILD
++#if 1
+   dir = FileUtil::JoinPath(dir, "Google");
+   // The permission of ~/Library/Application Support/Google seems to be 0755.
+   // TODO(komatsu): nice to make a wrapper function.
+Index: base/mac_process.mm
+===================================================================
+--- base/mac_process.mm	(revision 84)
++++ base/mac_process.mm	(working copy)
+@@ -100,7 +100,11 @@
+ 
+   // The Mozc Tool apps reside in the same directory where the mozc server does.
+   NSString *toolAppPath =
++#ifdef GOOGLE_JAPANESE_INPUT_BUILD
+       [NSString stringWithUTF8String:MacUtil::GetServerDirectory().c_str()];
++#else
++      @"/Library/Mozc/MozcTool.app/Contents/Resources";
++#endif
+ 
+   if (appName != nil) {
+     toolAppPath = [toolAppPath stringByAppendingPathComponent:appName];
+Index: base/process.cc
+===================================================================
+--- base/process.cc	(revision 48)
++++ base/process.cc	(working copy)
+@@ -50,6 +50,7 @@
+ #include <spawn.h>  // for posix_spawn().
+ #include <sys/stat.h>
+ #include "base/mac_process.h"
++#include <crt_externs.h>
+ #endif  // OS_MACOSX
+ 
+ #ifdef OS_LINUX
+@@ -67,8 +68,10 @@
+ // Defined somewhere in libc. We can't pass NULL as the 6th argument of
+ // posix_spawn() since Qt applications use (at least) DISPLAY and QT_IM_MODULE
+ // environment variables.
++#ifndef OS_MACOSX
+ extern char **environ;
+ #endif
++#endif
+ 
+ #ifdef OS_WINDOWS
+ namespace {
+@@ -309,6 +312,9 @@
+   // posix_spawn returns 0 even if kMozcServer doesn't exist, because
+   // the return value of posix_spawn is basically determined
+   // by the return value of fork().
++#if OS_MACOSX
++  char **environ = *_NSGetEnviron();
++#endif
+   const int result = ::posix_spawn(
+       &tmp_pid, path.c_str(), NULL, NULL, const_cast<char* const*>(argv.get()),
+       environ);
+Index: client/server_launcher.cc
+===================================================================
+--- client/server_launcher.cc	(revision 39)
++++ client/server_launcher.cc	(working copy)
+@@ -57,7 +57,11 @@
+ namespace mozc {
+ namespace client {
+ namespace {
++#if defined(OS_MACOSX) && !defined(GOOGLE_JAPANESE_INPUT_BUILD)
++const char kServerName[] = "mozc_session";
++#else
+ const char kServerName[] = "session";
++#endif
+ 
+ // Wait at most kServerWaitTimeout msec until server gets ready
+ const uint32 kServerWaitTimeout = 20000;  // 20 sec
+Index: ipc/mach_ipc.cc
+===================================================================
+--- ipc/mach_ipc.cc	(revision 48)
++++ ipc/mach_ipc.cc	(working copy)
+@@ -183,7 +183,11 @@
+ 
+   virtual bool IsServerRunning(const string &name) const {
+     string server_label = MacUtil::GetLabelForSuffix("");
++#ifdef GOOGLE_JAPANESE_INPUT_BUILD
+     if (name == "session") {
++#else
++    if (name == "mozc_session") {
++#endif
+       server_label += "Converter";
+     } else if (name == "renderer") {
+       server_label += "Renderer";
+Index: session/session_server.cc
+===================================================================
+--- session/session_server.cc	(revision 124)
++++ session/session_server.cc	(working copy)
+@@ -56,8 +56,13 @@
+ #endif  // OS_WINDOWS or not
+ 
+ const int kTimeOut = 5000;  // 5000msec
++#if defined(OS_MACOSX) && !defined(GOOGLE_JAPANESE_INPUT_BUILD)
++const char kSessionName[] = "mozc_session";
++const char kEventName[] = "mozc_session";
++#else
+ const char kSessionName[] = "session";
+ const char kEventName[] = "session";
++#endif
+ 
+ }  // namespace
+ 
+Index: client/client.cc
+===================================================================
+--- client/client.cc	(revision 70)
++++ client/client.cc	(working copy)
+@@ -60,7 +60,11 @@
+ namespace client {
+ 
+ namespace {
++#if defined(OS_MACOSX) && !defined(GOOGLE_JAPANESE_INPUT_BUILD)
++const char kServerAddress[]    = "mozc_session";  // name for the IPC connection.
++#else
+ const char kServerAddress[]    = "session";  // name for the IPC connection.
++#endif
+ const int    kResultBufferSize = 8192 * 32;   // size of IPC buffer
+ const size_t kMaxPlayBackSize  = 512;   // size of maximum history
+ 
+Index: build_mozc.py
+===================================================================
+--- build_mozc.py	(revision 151)
++++ build_mozc.py	(working copy)
+@@ -210,6 +210,8 @@
+     if not PkgExists('ibus-1.0 >= 1.4.1'):
+       logging.info('removing ibus.gyp.')
+       gyp_file_names.remove('%s/unix/ibus/ibus.gyp' % SRC_DIR)
++  elif options.target_platform == 'Mac':
++    gyp_file_names.extend(glob.glob('%s/unix/uim/*.gyp' % SRC_DIR))
+   elif options.target_platform == 'NaCl':
+     # Add chrome NaCl Mozc gyp scripts.
+     gyp_file_names.append('%s/chrome/nacl/nacl_extension.gyp' % SRC_DIR)
+Index: server/mozc_server.cc
+===================================================================
+--- server/mozc_server.cc	(revision 151)
++++ server/mozc_server.cc	(working copy)
+@@ -100,10 +100,11 @@
+     LOG(FATAL) << "Do not execute Mozc server as high authority";
+     return;
+   }
+-
++#if 0
+   if (mozc::config::StatsConfigUtil::IsEnabled()) {
+     mozc::CrashReportHandler::Initialize(false);
+   }
++#endif
+   InitGoogle(arg0, argc, argv, remove_flags);
+ 
+   if (run_level == mozc::RunLevel::RESTRICTED) {
+@@ -115,7 +116,11 @@
+ }
+ 
+ int MozcServer::Run() {
++#if defined(OS_MACOSX) && !defined(GOOGLE_JAPANESE_INPUT_BUILD)
++  string mutex_name = "mozc_server";
++#else
+   string mutex_name = "server";
++#endif
+   mozc::ProcessMutex mutex(mutex_name.c_str());
+   if (!mutex.Lock()) {
+     LOG(INFO) << "Mozc Server is already running";
+Index: data_manager/packed/packed_data_manager.gyp
+===================================================================
+--- data_manager/packed/packed_data_manager.gyp	(revision 151)
++++ data_manager/packed/packed_data_manager.gyp	(working copy)
+@@ -47,5 +47,13 @@
+       },
+       'includes': [ 'packed_data_manager.gypi' ],
+     }],
++    ['branding=="GoogleJapaneseInput"', {
++      'variables': {
++        'dataset_dir': 'oss',
++        'dataset_tag': 'oss',
++      },
++      'includes': [ 'packed_data_manager.gypi' ],
++    }],
++
+   ],
+ }
+Index: server/server.gyp
+===================================================================
+--- server/server.gyp	(revision 170)
++++ server/server.gyp	(working copy)
+@@ -113,7 +113,7 @@
+         'mozc_server.cc',
+       ],
+       'dependencies': [
+-        '../base/base.gyp:crash_report_handler',
++        #'../base/base.gyp:crash_report_handler',
+         '../session/session.gyp:session_server',
+         '../usage_stats/usage_stats_base.gyp:usage_stats',
+       ],
+Index: gui/gui.gyp
+===================================================================
+--- gui/gui.gyp	(revision 170)
++++ gui/gui.gyp	(working copy)
+@@ -965,7 +965,7 @@
+         'tool/mozc_tool_libmain.cc',
+       ],
+       'dependencies': [
+-        '../base/base.gyp:crash_report_handler',
++        #'../base/base.gyp:crash_report_handler',
+         '../config/config.gyp:stats_config_util',
+         'about_dialog_lib',
+         'administration_dialog_lib',

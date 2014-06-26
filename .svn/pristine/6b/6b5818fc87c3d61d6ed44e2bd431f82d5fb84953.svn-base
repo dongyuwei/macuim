@@ -1,0 +1,302 @@
+#!/bin/bash
+
+# usage
+# ./build --apply-patch		# just apply patches
+# QTDIR=/usr/lib64/qt4 ./build	# build and install
+#
+# ./build --clear-patch		# remove uim-mozc patches
+#
+#
+# For Linux, please install following icons
+#  * ui-tool.png -> $prefix/share/uim/pixmaps/mozc_tool_selector.png
+#  * ime_product_icon_opensource-32.png -> $prefix/share/uim/pixmaps/mozc.png
+#  * ui-properties.png -> $prefix/share/uim/pixmaps/mozc_tool_config_dialog.png
+#  * ui-dictionary.png -> $prefix/share/uim/pixmaps/mozc_tool_dictionary_tool.png
+
+top=`pwd`
+os=`uname -s`
+PATCH0=${top}/mozc-macosx.diff
+PATCH1=${top}/gyp-macosx.diff
+PATCH2=${top}/gyp-macosx-i386.diff
+PATCH3=${top}/gyp-macosx-x86_64.diff
+PATCH6=${top}/mozc_tool-macosx.diff
+PATCH7=${top}/mozc_tool-macuim.diff
+PATCH10=${top}/mozc-kill-line.diff
+PATCH11=${top}/zinnia-macosx.diff
+PATCH12=${top}/uim-mozc-macuim.diff
+
+## following variables are only effective on MacUIM
+dest="${top}/../Package/dest"
+fwdir="/Library/Frameworks/UIM.framework/Versions/Current"
+mozcdir="/Library/Mozc"
+launchagentdir="/Library/LaunchAgents"
+uim_build_dir="${top}/../UIM/uim"
+## Fedora?
+fedora=no
+## variable "target" is only effective for Darwin
+target="MacUIM"
+#target="Fink i386"
+#target="Fink x86_64"
+## branding :)
+branding="Mozc"
+#branding="GoogleJapaneseInput"
+
+if [ ! -d depot_tools ]; then
+	svn co http://src.chromium.org/svn/trunk/tools/depot_tools
+fi
+
+export PATH=$PATH:`pwd`/depot_tools
+export PKG_CONFIG_PATH=/Library/Frameworks/UIM.framework/Versions/Current/lib/pkgconfig:$PKG_CONFIG_PATH
+
+if [ ! -d mozc ]; then
+	echo "pull mozc"
+	mkdir mozc
+	cd mozc
+		gclient config http://mozc.googlecode.com/svn/trunk/src
+		gclient sync
+	cd -
+fi
+
+
+pushd mozc/src
+	# apply patches
+	if test -n "$1" && test $1 = "--apply-patch" ;then
+		echo "apply patches"
+		if [ -d unix/uim ]; then
+			rm -rf unix/uim
+		fi
+		rsync -auv --exclude=.svn ${top}/uim unix/
+		if [ ${os} = "Darwin" ]; then
+
+			case "${target}" in
+			"Fink i386")
+				(cd third_party/gyp; patch -p0 < ${PATCH2})
+				;;
+			"Fink x86_64")
+				(cd third_party/gyp; patch -p0 < ${PATCH3})
+				;;
+			"MacUIM")
+				(cd third_party/gyp; patch -p0 < ${PATCH1})
+				rm -f unix/uim/uim.gyp
+				;;
+			esac
+			rm -f unix/uim/uim.gyp
+			(cd third_party/zinnia/v0_04/zinnia; patch -p1 < ${PATCH11})
+			(cd third_party/zinnia/v0_04; ln -sf zinnia/* .)
+			rm -f mac/org.mozc.inputmethod.Japanaes.Converter.MacUIM.plist
+			rm -f mac/mozc_server_info
+			patch -p0 < ${PATCH0}
+			rm -f mac/shared_subpackage_info
+			patch -p0 < ${PATCH6}
+			if [ "${target}" = "MacUIM" ]; then
+				patch -p0 < ${PATCH7}
+				rm -f unix/uim/uim-macfink.gyp
+			else
+				rm -f unix/uim/uim-macuim.gyp
+			fi
+		fi
+		# kill-line patch
+		patch -p0 < ${PATCH10}
+		exit
+	fi
+
+	# clear patches and exit
+	if test -n "$1" && test $1 = "--clear-patch" ;then
+		echo "cleanup patches"
+		svn status . | grep "^M" | sed -e 's/^M//' | xargs svn revert
+		svn status third_party/gyp | grep "^M" | sed -e 's/^M//' | xargs svn revert
+		svn status third_party/zinnia/v0_04 | grep "^M" | sed -e 's/^M//' | xargs svn revert
+		rm -rf unix/uim/
+		rm -f mac/org.mozc.inputmethod.Japanaes.Converter.MacUIM.plist
+		rm -f mac/mozc_server_info
+		rm -f mac/shared_subpackage_info
+		exit
+	fi
+
+	if test -n "$1" && test $1 = "--help" ;then
+		cat <<HERE
+# usage
+# ./build --apply-patch		# just apply patches
+# ./build			# build and install
+#                               # (specify QTDIR if needed)
+# ./build --help		# show help
+# ./build --clear-patch		# remove uim-mozc patches
+HERE
+		exit
+	fi
+
+	# check unix/uim
+	if [ ! -d unix/uim ]; then
+		echo "./build --apply-patch first"
+		exit
+	fi
+
+	# gyp
+	echo "generate rules"
+	if [ ${fedora} = "yes" ]; then
+		config_option="--server_dir=/usr/libexec"
+	fi
+	PKG_CONFIG_PATH=${QTDIR}/lib/pkgconfig python build_mozc.py gyp --branding=${branding} ${config_option}
+
+	# build build_tools
+	echo "build_tools"
+	python build_mozc.py build_tools -c Release
+
+	# build libuim-mozc.so
+	echo "build"
+	if [ ${os} = "Darwin" ]; then
+		if [ "${target}" = "MacUIM" ]; then
+			python build_mozc.py build -c Release unix/uim/uim-macuim.gyp:uim-mozc
+		else
+			python build_mozc.py build -c Release unix/uim/uim-macfink.gyp:uim-mozc
+		fi
+	else
+		python build_mozc.py build -c Release unix/uim/uim.gyp:uim-mozc
+	fi
+	if [ $? != 0 ]; then
+		echo "failed"
+		exit
+	fi
+	if [ $branding != "Mozc" ]; then
+		exit 0
+	fi
+
+	# build mozc_server
+	python build_mozc.py build -c Release server/server.gyp:mozc_server
+	if [ $? != 0 ]; then
+		echo "failed"
+		exit
+	fi
+
+	# build mozc_tool
+	if [ ${os} = Darwin -a "${target}" = "MacUIM" ] ; then
+		cp -pf gui/gui.xcodeproj/project.pbxproj \
+		       gui/gui.xcodeproj/project.pbxproj.orig
+		sed -e '/x86_64/d' gui/gui.xcodeproj/project.pbxproj.orig > \
+				   gui/gui.xcodeproj/project.pbxproj
+	fi
+	python build_mozc.py build -c Release gui/gui.gyp:mozc_tool
+	if [ $? != 0 ]; then
+		echo "failed"
+		exit
+	fi
+	if [ ${os} = Darwin -a "${target}" = "MacUIM" ] ; then
+		cd out_mac/Release
+			rm -rf MozcTool.app/Contents/Frameworks
+			mkdir -p MozcTool.app/Contents/Frameworks
+			cp -R ${QTDIR}/lib/QtCore.framework \
+				MozcTool.app/Contents/Frameworks
+			cp -R ${QTDIR}/lib/QtGui.framework \
+				MozcTool.app/Contents/Frameworks
+			rm -f MozcTool.app/Contents/Frameworks/QtCore.framework/QtCore_debug*
+			rm -f MozcTool.app/Contents/Frameworks/QtCore.framework/Versions/4/QtCore_debug
+			rm -rf MozcTool.app/Contents/Frameworks/QtCore.framework/Versions/4/Headers
+			rm -f MozcTool.app/Contents/Frameworks/QtGui.framework/QtGui_debug*
+			rm -f MozcTool.app/Contents/Frameworks/QtGui.framework/Versions/4/QtGui_debug
+			rm -rf MozcTool.app/Contents/Frameworks/QtGui.framework/Versions/4/Headers
+			install_name_tool -id \
+				@executable_path/../Frameworks/QtCore.framework/Versions/4/QtCore \
+				MozcTool.app/Contents/Frameworks/QtCore.framework/Versions/4/QtCore
+			install_name_tool -id \
+				@executable_path/../Frameworks/QtGui.framework/Versions/4/QtGui \
+				MozcTool.app/Contents/Frameworks/QtGui.framework/Versions/4/QtGui
+
+			install_name_tool -change \
+			 	${QTDIR}/lib/QtCore.framework/Versions/4/QtCore \
+				@executable_path/../Frameworks/QtCore.framework/Versions/4/QtCore \
+				MozcTool.app/Contents/MacOS/MozcTool
+			install_name_tool -change \
+			 	${QTDIR}/lib/QtGui.framework/Versions/4/QtGui \
+				@executable_path/../Frameworks/QtGui.framework/Versions/4/QtGui \
+				MozcTool.app/Contents/MacOS/MozcTool
+
+			install_name_tool -change ${QTDIR}/lib/QtCore.framework/Versions/4/QtCore \
+			 	@executable_path/../Frameworks/QtCore.framework/Versions/4/QtCore \
+				MozcTool.app/Contents/Frameworks/QtGui.framework/Versions/4/QtGui
+
+			install_name_tool -change \
+			 	${QTDIR}/lib/QtCore.framework/Versions/4/QtCore \
+				@executable_path/../Frameworks/QtCore.framework/Versions/4/QtCore \
+				MozcTool_lib.framework/Versions/A/MozcTool_lib
+			install_name_tool -change \
+			 	${QTDIR}/lib/QtGui.framework/Versions/4/QtGui \
+				@executable_path/../Frameworks/QtGui.framework/Versions/4/QtGui \
+				MozcTool_lib.framework/Versions/A/MozcTool_lib
+
+
+		cd -
+	fi
+	if [ ${os} = Darwin -a "${target}" = "MacUIM" ] ; then
+		python build_mozc.py build -c Release gui/gui.gyp:about_dialog_mac
+		python build_mozc.py build -c Release gui/gui.gyp:config_dialog_mac
+		python build_mozc.py build -c Release gui/gui.gyp:dictionary_tool_mac
+		python build_mozc.py build -c Release gui/gui.gyp:error_message_dialog_mac
+		python build_mozc.py build -c Release gui/gui.gyp:word_register_dialog_mac
+		python build_mozc.py build -c Release gui/gui.gyp:hand_writing_mac
+	fi
+
+popd
+
+# install  
+if [ ${os} = Darwin -a "${target}" = "MacUIM" ] ; then
+	echo "install"
+	mkdir -p ${dest}
+	install mozc/src/out_mac/Release/libuim-mozc.so \
+		${dest}/${fwdir}/pkglib/plugin/
+	install scm/mozc*.scm ${dest}/${fwdir}/share/uim/
+	patch -p1 -d ${dest}/${fwdir}/share/uim < ${PATCH12}
+
+	# put into uim build dir too
+	install mozc/src/out_mac/Release/libuim-mozc.so \
+		${uim_build_dir}/uim/
+	install -m 644 scm/mozc*.scm ${uim_build_dir}/scm/
+	patch -p1 -d ${uim_build_dir}/scm < ${PATCH12}
+
+	# register mozc
+	make -C ${uim_build_dir}/uim uim-module-manager && \
+	LIBUIM_SYSTEM_SCM_FILES=${uim_build_dir}/sigscheme/lib \
+	LIBUIM_SCM_FILES=${uim_build_dir}/scm \
+	LIBUIM_PLUGIN_LIB_DIR=${uim_build_dir}/uim/.libs \
+	UIM_DISABLE_NOTIFY=1 ${uim_build_dir}/uim/uim-module-manager \
+	            --path ${uim_build_dir}/scm --register mozc
+
+	# install server
+	mkdir -p ${dest}/${mozcdir}
+	rm -rf ${dest}/${mozcdir}/*
+	rsync -auv mozc/src/out_mac/Release/MozcConverter.app \
+		${dest}/${mozcdir}/
+
+	mkdir -p ${dest}/${launchagentdir}
+	cp -p mozc/src/mac/org.mozc.inputmethod.Japanaes.Converter.MacUIM.plist \
+		${dest}/${launchagentdir}
+
+	# install tool
+	rsync -auv mozc/src/out_mac/Release/MozcTool.app \
+		${dest}/${mozcdir}/
+	rsync -auv mozc/src/out_mac/Release/MozcTool_lib.framework \
+		${dest}/${mozcdir}/MozcTool.app/Contents/Frameworks/
+
+	mkdir -p ${dest}/${mozcdir}/MozcTool.app/Contents/Resources
+	rsync -auv mozc/src/out_mac/Release/ConfigDialog.app \
+	        ${dest}/${mozcdir}/MozcTool.app/Contents/Resources/
+	rsync -auv mozc/src/out_mac/Release/AboutDialog.app \
+	        ${dest}/${mozcdir}/MozcTool.app/Contents/Resources/
+	rsync -auv mozc/src/out_mac/Release/ErrorMessageDialog.app \
+	        ${dest}/${mozcdir}/MozcTool.app/Contents/Resources/
+	rsync -auv mozc/src/out_mac/Release/DictionaryTool.app \
+	        ${dest}/${mozcdir}/MozcTool.app/Contents/Resources/
+	rsync -auv mozc/src/out_mac/Release/WordRegisterDialog.app \
+	        ${dest}/${mozcdir}/MozcTool.app/Contents/Resources/
+	rsync -auv mozc/src/out_mac/Release/HandWriting.app \
+	        ${dest}/${mozcdir}/MozcTool.app/Contents/Resources/
+
+	# install handwriting-ja.model
+	if [ ! -d tegaki-zinnia-japanese-0.3 ]; then
+		curl -O http://www.tegaki.org/releases/0.3/models/tegaki-zinnia-japanese-0.3.zip
+		unzip tegaki-zinnia-japanese-0.3.zip
+	fi
+	if [ ! -f ${dest}/${mozcdir}/MozcTool.app/Contents/Resources/handwriting-ja.model ]; then
+		cp -vp tegaki-zinnia-japanese-0.3/handwriting-ja.model ${dest}/${mozcdir}/MozcTool.app/Contents/Resources/
+		ln -sf ${mozcdir}/MozcTool.app/Contents/Resources/handwriting-ja.model ${dest}/${mozcdir}/MozcTool.app/Contents/Resources/HandWriting.app/Contents/Resources/
+	fi
+fi

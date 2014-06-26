@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSHumanReadableCopyright</key>
+	<string>© MacUIM contributers, 2005-2014</string>
+	<key>CFBundleName</key>
+	<string>MacUIM</string>
+	<key>CFBundleDisplayName</key>
+	<string>MacUIM</string>
+	<key>CFBundleShortVersionString</key>
+	<string>MacUIM version 0.6.16</string>
+	<key>CFBundleGetInfoString</key>
+	<string>MacUIM version 0.6.16.1, Copyright 2005-2014, MacUIM contributers</string>
+	<key>com.apple.inputmethod.Japanese</key>
+	<string>MacUIM (Japanese)</string>
+	<key>com.apple.inputmethod.TradChinese</key>
+	<string>MacUIM (Traditional Chinese)</string>
+	<key>com.apple.inputmethod.SimpChinese</key>
+	<string>MacUIM (Simplified Chinese)</string>
+	<key>com.apple.inputmethod.Korean</key>
+	<string>MacUIM (Korean)</string>
+	<key>com.apple.inputmethod.Roman</key>
+	<string>MacUIM (Roman)</string>
+</dict>
+</plist>

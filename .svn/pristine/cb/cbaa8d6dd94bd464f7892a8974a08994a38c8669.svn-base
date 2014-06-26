@@ -1,0 +1,12 @@
+#!/bin/sh
+
+top=`pwd`
+
+#BUILDCONFIGURATION="\"Deployment\""
+BUILDCONFIGURATION="\"Release\""
+export BUILDCONFIGURATION
+
+make growlapplicationbridge
+
+rm -rf ${top}/../Growl.framework/
+mv -v ${top}/build/Release/Growl.framework ${top}/../
